@@ -1,124 +1,121 @@
-const express = require('express');
-const router = express.Router();
-const mongoose = require('mongoose');
-const bcrypt = require('bcryptjs');
-const jwt = require('jsonwebtoken');
+/**********************************************************************
+ * routes/users.js
+ *********************************************************************/
+const express  = require('express');
+const router   = express.Router();
+const bcrypt   = require('bcryptjs');
+const jwt      = require('jsonwebtoken');
 
-const User = require('../models/user');
+const User     = require('../models/user');          // cleaned-up schema
+const checkAuth = require('../middleware/check-auth');
 
-//Sign Up Route
-router.post('/signup', (req, res, next) => {
-    User.find({email: req.body.email})
-    .exec()
-    .then(user => {
-        if (user.length >= 1) {
-            return res.status(422).json({
-                message: "Email already taken by another user"
-            })
-        }
-        else
-        {
-            bcrypt.hash(req.body.password, 10, (err, hash) => {
-                if (err)
-                {
-                    return res.status(500).json({
-                        error: err
-                    });
-                }
-                else
-                {
-                    const user = new User({
-                        _id: new mongoose.Types.ObjectId(),
-                        email: req.body.email,
-                        password: hash
-                    });
-    
-                    user.save()
-                    .then(result => {
-                        console.log(result);
-                        res.status(201).json({
-                            message: "User Succesfully created"
-                        })
-                    })
-                    .catch(err => {
-                        console.log(err);
-                        res.status(500).json({
-                            error: err
-                        });
-                    });
-                }
-            });
-        }
-    }); 
+/* ------------------------------------------------------------------ */
+/* GET /users  – list all users (password omitted)                     */
+/* ------------------------------------------------------------------ */
+router.get('/', async (_req, res) => {
+  try {
+    const users = await User.find().lean().select('-password -__v');
+    res.status(200).json({ count: users.length, users });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err });
+  }
+});
+
+/* ------------------------------------------------------------------ */
+/* GET /users/:userId  – fetch one user by id (password omitted)       */
+/* ------------------------------------------------------------------ */
+router.get('/:userId', async (req, res) => {
+  try {
+    const user = await User.findById(req.params.userId)
+                           .lean()
+                           .select('-password -__v');
+    if (!user) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json(user);
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err });
+  }
 });
 
 
-router.post('/login', (req, res, next) => {
-    User.find({email: req.body.email}).exec()
-    .then(user => {
-        if (user.length < 1) //If user email exists
-        {
-            return res.status(401).json({
-                message: "Auth Failed"
-            });
-        }
+router.post('/signup', async (req, res) => {
+  try {
+    const email = (req.body.email || '').toLowerCase().trim();
+    if (!email || !req.body.password) {
+      return res.status(400).json({ message: 'Email and password required' });
+    }
 
-        bcrypt.compare(req.body.password, user[0].password, (err, result) => {
-            if (err) { //If password comparison failed
-                return res.status(401).json({
-                    message: "Auth Failed"
-                });
-            }
+    if (await User.exists({ email })) {
+      return res.status(409).json({ message: 'Email already exists' });
+    }
 
-            if (result) { //Correct Password
+    const hash = await bcrypt.hash(req.body.password, 10);
 
-                const token = jwt.sign(
-                    {
-                        email: user[0].email,
-                        userId: user[0].id
-                    }, process.env.JWT_KEY , {expiresIn: "1h"}
-                )
+    const user = await User.create({
+      email: email,
+      password: hash,
+    });
 
-                return res.status(200).json({
-                    message: "Auth Successful",
-                    token: token
-                })
-            }
-            else //Password Failed
-            {
-                return res.status(401).json({
-                    message: "Auth Failed"
-                });
-            }
+    const { password, ...safeUser } = user.toObject();
+    res.status(201).json({ message: 'User created', createdUser: safeUser });
 
-        })
+  } catch (err) {
+    console.error(err);
+    if (err.code === 11000) {                    // race-condition fallback
+      return res.status(409).json({ message: 'Email already exists' });
+    }
+    res.status(500).json({ error: err });
+  }
+});
 
 
-    })
-    .catch(err => {
-        console.log(err);
-        res.status(500).json({
-            error: err
-        });
-    })
-})
+router.post('/login', async (req, res) => {
+  try {
+    const email    = (req.body.email || '').toLowerCase().trim();
+    const password = req.body.password || '';
 
-//Delete Route
-router.delete('/:userId', (req, res, next) => {
+    if (!email || !password) {
+      return res.status(400).json({ message: 'Email and password required' });
+    }
 
-    const userId = req.params.userId;
+    const user = await User.findOne({ email })
+                           .select('+password')   // schema has select:false
+                           .lean();
 
-    User.deleteOne({_id: userId}).exec()
-    .then(result => {
-        console.log(result);
-        res.status(200).json({
-            message: 'User deleted'
-        })
-    })
-    .catch(err => {
-        console.log(err);
-        res.status(500).json({error: err});
-    })
-})
+    if (!user || !(await bcrypt.compare(password, user.password))) {
+      return res.status(401).json({ message: 'Auth failed' });
+    }
+
+    const token = jwt.sign(
+      { userId: user._id, email: user.email, role: 'user' },
+      process.env.JWT_KEY,
+      { expiresIn: '1h' }
+    );
+
+    const { password: _, ...safeUser } = user;   // drop hash
+    res.status(200).json({ message: 'Auth successful', token, user: safeUser });
+
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err });
+  }
+});
+
+
+router.delete('/:userId', checkAuth, async (req, res) => {
+  try {
+    const result = await User.deleteOne({ _id: req.params.userId });
+    if (result.deletedCount === 0) {
+      return res.status(404).json({ message: 'User not found' });
+    }
+    res.status(200).json({ message: 'User deleted', result });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err });
+  }
+});
 
 module.exports = router;
