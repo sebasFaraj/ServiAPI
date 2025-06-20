@@ -1,49 +1,55 @@
-/**********************************************************************
- * routes/users.js
- *********************************************************************/
-const express  = require('express');
-const router   = express.Router();
-const bcrypt   = require('bcryptjs');
-const jwt      = require('jsonwebtoken');
+// Routes
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 
-const User     = require('../models/user');          // cleaned-up schema
-const checkAuth = require('../middleware/check-auth');
+const User = require('../models/user');
+const checkAuth = require('../middleware/check-auth'); //Add in later
 
-/* ------------------------------------------------------------------ */
-/* GET /users  – list all users (password omitted)                     */
-/* ------------------------------------------------------------------ */
+//GET Routes
+
+//Get all users (omit password)
 router.get('/', async (_req, res) => {
   try {
-    const users = await User.find().lean().select('-password -__v');
+    const users = await User.find()
+      .lean()
+      .select('-password -__v');
+
     res.status(200).json({ count: users.length, users });
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
     res.status(500).json({ error: err });
   }
 });
 
-/* ------------------------------------------------------------------ */
-/* GET /users/:userId  – fetch one user by id (password omitted)       */
-/* ------------------------------------------------------------------ */
+//Get a specific user (omit password)
 router.get('/:userId', async (req, res) => {
   try {
     const user = await User.findById(req.params.userId)
-                           .lean()
-                           .select('-password -__v');
+      .lean()
+      .select('-password -__v');
+
     if (!user) {
       return res.status(404).json({ message: 'User not found' });
     }
+
     res.status(200).json(user);
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
     res.status(500).json({ error: err });
   }
 });
 
+//POST Routes
 
+//Create a new user
 router.post('/signup', async (req, res) => {
   try {
     const email = (req.body.email || '').toLowerCase().trim();
+
     if (!email || !req.body.password) {
       return res.status(400).json({ message: 'Email and password required' });
     }
@@ -54,27 +60,30 @@ router.post('/signup', async (req, res) => {
 
     const hash = await bcrypt.hash(req.body.password, 10);
 
-    const user = await User.create({
-      email: email,
-      password: hash,
-    });
+    const user = await User.create
+      ({
+        email: email,
+        password: hash,
+      });
 
-    const { password, ...safeUser } = user.toObject();
+    const { password: _, __v: __, ...safeUser } = user.toObject();
     res.status(201).json({ message: 'User created', createdUser: safeUser });
 
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
-    if (err.code === 11000) {                    // race-condition fallback
+    if (err.code === 11000)  // race-condition fallback
+    {
       return res.status(409).json({ message: 'Email already exists' });
     }
     res.status(500).json({ error: err });
   }
 });
 
-
+//Logs in an existing User
 router.post('/login', async (req, res) => {
   try {
-    const email    = (req.body.email || '').toLowerCase().trim();
+    const email = (req.body.email || '').toLowerCase().trim();
     const password = req.body.password || '';
 
     if (!email || !password) {
@@ -82,8 +91,8 @@ router.post('/login', async (req, res) => {
     }
 
     const user = await User.findOne({ email })
-                           .select('+password')   // schema has select:false
-                           .lean();
+      .select('+password')   // schema has select:false
+      .lean();
 
     if (!user || !(await bcrypt.compare(password, user.password))) {
       return res.status(401).json({ message: 'Auth failed' });
@@ -95,24 +104,28 @@ router.post('/login', async (req, res) => {
       { expiresIn: '1h' }
     );
 
-    const { password: _, ...safeUser } = user;   // drop hash
+    const { password: _, __v: __, ...safeUser } = user;   // drop hash
     res.status(200).json({ message: 'Auth successful', token, user: safeUser });
 
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
     res.status(500).json({ error: err });
   }
 });
 
+//DELETE Routes
 
-router.delete('/:userId', checkAuth, async (req, res) => {
+//Delete a user with a specific ID from the database 
+router.delete('/:userId', async (req, res) => {
   try {
     const result = await User.deleteOne({ _id: req.params.userId });
     if (result.deletedCount === 0) {
       return res.status(404).json({ message: 'User not found' });
     }
     res.status(200).json({ message: 'User deleted', result });
-  } catch (err) {
+  }
+  catch (err) {
     console.error(err);
     res.status(500).json({ error: err });
   }
