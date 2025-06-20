@@ -12,41 +12,36 @@ const bookingSchema = new mongoose.Schema(
     },
     client: {
       type: mongoose.Schema.Types.ObjectId,
-      ref: 'User',           // <-- change to actual Users
+      ref: 'User',
       required: true
     },
     bookingDuration: {
       type: Number,          // in minutes
-      required: true,
+      required: false,
       min: 1
     },
-
     status: {
       type: String,
       enum: ['Requested', 'Accepted', 'InProgress', 'Completed', 'Cancelled', 'NoShow'],
-      default: 'Reuested'
+      default: 'Requested'
     },
-
     price: {
       type: Number,
       required: true,
       min: 0
     },
-
     carPreference: {
       type: String,
-      enum: ['OptionA', 'OptionB'],  // replace with actual choices
+      enum: ['User Car', 'Provider Car'],  // replace with actual choices
       default: 'OptionA'
     },
-
-    clientRating:   { type: Number, min: 1, max: 5 },
+    clientRating: { type: Number, min: 1, max: 5 },
     providerRating: { type: Number, min: 1, max: 5 },
-
     scheduled: { type: Boolean, default: false },
     scheduledStartTime: { type: Date },
-    actualStartTime:    { type: Date },
-    scheduledEndTime:   { type: Date },
-    actualEndTime:      { type: Date },
+    actualStartTime: { type: Date },
+    scheduledEndTime: { type: Date },
+    actualEndTime: { type: Date },
 
     distance: { type: Number, min: 0 }
   },
@@ -54,7 +49,7 @@ const bookingSchema = new mongoose.Schema(
 );
 
 
-//                         Custom Validators
+//Custom Validators
 
 /* 1) Only one of completed / cancelled / noShow can be true */
 bookingSchema.pre('validate', function (next) {
@@ -71,8 +66,7 @@ bookingSchema.pre('validate', function (next) {
 /* 2) If scheduled === true, both scheduledStartTime and scheduledEndTime
       must exist and start < end                                          */
 bookingSchema.pre('validate', function (next) {
-  if (this.scheduled) 
-  {
+  if (this.scheduled) {
     if (!this.scheduledStartTime || !this.scheduledEndTime) {
       return next(
         new Error(

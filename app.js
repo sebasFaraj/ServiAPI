@@ -17,6 +17,7 @@ app.use(bodyParser.json());
 //User Routes
 const userRoutes = require('./api/routes/users');
 const indProvider = require('./api/routes/indproviders');
+const bookingRoutes = require('./api/routes/bookings');
 
 app.use(morgan('dev')); //Start Logging
 
@@ -38,6 +39,7 @@ app.use((req, res, next) => {
 
 app.use('/users', userRoutes);
 app.use('/indproviders', indProvider);
+app.use('/bookings', bookingRoutes);
 
 
 //Error Handling
