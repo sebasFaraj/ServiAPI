@@ -63,6 +63,8 @@ router.post('/signup', async (req, res) => {
     const user = await User.create
       ({
         email: email,
+        firstName: req.body.firstName,
+        lastName: req.body.lastName,
         password: hash,
       });
 

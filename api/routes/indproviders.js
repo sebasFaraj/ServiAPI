@@ -62,6 +62,8 @@ router.post('/signup', async (req, res, next) => {
 
     const provider = new Provider({
       email: req.body.email,
+      firstName: req.body.firstName,
+      lastName: req.body.lastName,
       password: hash,
       phone: req.body.phone,
       birthdate: req.body.birthdate,

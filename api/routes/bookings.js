@@ -99,7 +99,8 @@ router.post('/newBooking', async (req, res, next) => {
 
         const result = await booking.save();
 
-        //TODO: Add sanitzation
+
+        //TODO: Add sanitzation and error checking
         res.status(201).json({ message: "Booking Created", booking });
     }
     catch (err) {

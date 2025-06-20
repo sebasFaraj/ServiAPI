@@ -3,9 +3,9 @@ const mongoose = require('mongoose');
 //Slot (Availability) Schema
 const slotSchema = new mongoose.Schema(
   {
-    day:   { type: Number, required: true, min: 0, max: 6 },               // 0 = Sunday
-    start: { type: String,  required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ }, // HH:MM
-    end:   { type: String,  required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ }
+    day: { type: Number, required: true, min: 0, max: 6 },               // 0 = Sunday
+    start: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ }, // HH:MM
+    end: { type: String, required: true, match: /^([01]\d|2[0-3]):[0-5]\d$/ }
   },
   { _id: false }
 );
@@ -31,7 +31,15 @@ const independentProviderSchema = new mongoose.Schema(
       match:
         /[a-z0-9!#$%&'*+/=?^_`{|}~-]+(?:\.[a-z0-9!#$%&'*+/=?^_`{|}~-]+)*@(?:[a-z0-9](?:[a-z0-9-]*[a-z0-9])?\.)+[a-z0-9](?:[a-z0-9-]*[a-z0-9])?/i
     },
-    password: { type: String, required: true, select: false},
+    firstName: {
+      type: String,
+      required: true
+    },
+    lastName: {
+      type: String,
+      required: true
+    },
+    password: { type: String, required: true, select: false },
     phone: {
       type: String,
       required: true,
@@ -45,13 +53,13 @@ const independentProviderSchema = new mongoose.Schema(
         message: 'Birthdate must be in the past'
       }
     },
-    address:     { type: String, required: true },
+    address: { type: String, required: true },
     serviceType: {
       type: String,
       required: true,
       enum: ['Driver', 'Cleaning']   // adjust as needed
     },
-    bio:    { type: String, required: true },
+    bio: { type: String, required: true },
     rating: { type: Number, default: 5, min: 1, max: 5 },
     availability: {
       type: [slotSchema],
