@@ -16,12 +16,9 @@ app.use(bodyParser.json());
 
 //User Routes
 const userRoutes = require('./api/routes/users');
-const productRoutes = require('./api/routes/products');
+const indProvider = require('./api/routes/indproviders');
 
 app.use(morgan('dev')); //Start Logging
-
-
-
 
 //This response provides the headers we need to prevent CORS errors and then say what HTTP methods supported in the API
 app.use((req, res, next) => {
@@ -40,7 +37,7 @@ app.use((req, res, next) => {
 })
 
 app.use('/users', userRoutes);
-app.use('/products', productRoutes);
+app.use('/indproviders', indProvider);
 
 
 //Error Handling

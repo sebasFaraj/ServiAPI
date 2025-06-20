@@ -1,62 +1,60 @@
-const express  = require('express');
-const router   = express.Router();
-const mongoose = require('mongoose');
-const bcrypt   = require('bcryptjs');
-
+const express = require('express');
+const router = express.Router();
+const bcrypt = require('bcryptjs');
+const jwt = require('jsonwebtoken');
 const Provider = require('../models/indprovider');
 const checkAuth = require('../middleware/check-auth');
 
-//Gets and returns all independent providers
-router.get('/', (req, res, next) => {
-  Provider.find({})
-    .select('-__v -password')            
-    .exec()
-    .then(docs => {
-      res.status(200).json({
-        count: docs.length,
-        providers: docs
-      });
-    })
-    .catch(err => {
-      console.error(err);
-      res.status(500).json({ error: err });
-    });
+//GET Routes
+
+//Gets all providers (omit password)
+router.get('/', async (req, res, next) => {
+  try {
+    const providers = await Provider.find()
+      .lean()
+      .select('-password -__v');
+
+    res.status(200).json({ count: providers.length, providers });
+  }
+  catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err });
+  }
 });
 
 //Returns provider whose ID matches the one in the request
-router.get('/:providerId', (req, res, next) => {
-  Provider.findById(req.params.providerId)
-    .select('-__v -password') //Does not, or should not, return password
-    .exec()
-    .then(doc => {
-      if (!doc) {
-        return res.status(404).json({ message: 'Provider not found' });
-      }
-      res.status(200).json(doc);
-    })
-    .catch(err => {
-      console.error(err);
-      res.status(500).json({ error: err });
-    });
+router.get('/:providerId', async (req, res, next) => {
+  try {
+    const provider = await Provider.findById(req.params.providerId)
+      .lean()
+      .select('-password -__v');
+
+    if (!provider) {
+      return res.status(500).json({ message: 'Provider not found' });
+    }
+
+    res.status(200).json(provider);
+  }
+  catch (err) {
+    console.log(err);
+    res.status(500).json({ error: err });
+  }
+
 });
 
 //Creates a new independent provider
-router.post('/signup', async (req, res, next) => 
-{
-  try{
-    
+router.post('/signup', async (req, res, next) => {
+  try {
     const email = (req.body.email || '').toLowerCase().trim();
 
-    if (!email)
-    {
-      return res.status(400).json({message: "Email is required"});
+    if (!email) {
+      return res.status(400).json({ message: "Email is required" });
     }
-    
-    const exists = await Provider.exists({email});
 
-    if (exists)
-    {
-      return res.status(409).json({message: "Email already exists"});
+    const exists = await Provider.exists({ email });
+
+    if (exists) {
+      return res.status(409).json({ message: "Email already exists" });
     }
 
 
@@ -77,12 +75,12 @@ router.post('/signup', async (req, res, next) =>
     const result = await provider.save();
 
     //Strip password before sending back
-    const { password, ...sanitized } = result.toObject();
+    const { password: _, __v: __, ...sanitized } = result.toObject();
     res.status(201).json({
       message: 'Provider created',
       createdProvider: sanitized
     });
-  } 
+  }
 
   catch (err) {
     console.error(err);
@@ -97,14 +95,13 @@ router.post('/signup', async (req, res, next) =>
 //Logs in an independent provider
 router.post('/login', async (req, res) => {
   try {
-   
-    const email    = (req.body.email || '').toLowerCase().trim();
+
+    const email = (req.body.email || '').toLowerCase().trim();
     const password = req.body.password || '';
 
     if (!email || !password) {
       return res.status(400).json({ message: 'Email and password required' });
     }
-
 
     const provider = await Provider
       .findOne({ email })

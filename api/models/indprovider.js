@@ -1,6 +1,6 @@
 const mongoose = require('mongoose');
 
-/* ---------- Slot (availability) sub-document ---------- */
+//Slot (Availability) Schema
 const slotSchema = new mongoose.Schema(
   {
     day:   { type: Number, required: true, min: 0, max: 6 },               // 0 = Sunday
@@ -9,6 +9,8 @@ const slotSchema = new mongoose.Schema(
   },
   { _id: false }
 );
+
+//This schema 
 
 /* Optional – make sure end is after start */
 slotSchema.pre('validate', function (next) {
@@ -21,7 +23,6 @@ slotSchema.pre('validate', function (next) {
 /* ---------- Independent Provider schema ---------- */
 const independentProviderSchema = new mongoose.Schema(
   {
-    _id: mongoose.Schema.Types.ObjectId,
     email: {
       type: String,
       required: true,
