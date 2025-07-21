@@ -34,6 +34,13 @@ const userSchema = mongoose.Schema({
         min: 0,
     },
     password: { type: String, required: true, selected: false },
+    phone: {
+      type: String,
+      required: true,
+      match: /^\+504\s\d{4}-\d{4}$/ // +504 ####-####
+    }
+
+    //Rating
 },
     { timestamps: true }
 );

@@ -3,6 +3,7 @@ const mongoose = require('mongoose');
 const User = require('./user');
 const IndProvider = require('./indprovider');
 
+
 const bookingSchema = new mongoose.Schema(
   {
     provider: {
@@ -30,6 +31,11 @@ const bookingSchema = new mongoose.Schema(
       required: true,
       min: 0
     },
+    earnings: {
+      type: Number,
+      required: true,
+      min: 0
+    },
     carPreference: {
       type: String,
       enum: ['User Car', 'Provider Car'],  // replace with actual choices
@@ -42,8 +48,6 @@ const bookingSchema = new mongoose.Schema(
     actualStartTime: { type: Date },
     scheduledEndTime: { type: Date },
     actualEndTime: { type: Date },
-
-    distance: { type: Number, min: 0 }
   },
   { timestamps: true }
 );

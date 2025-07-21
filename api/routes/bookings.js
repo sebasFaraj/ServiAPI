@@ -21,6 +21,8 @@ router.get('/', async (req, res, next) => {
     }
 });
 
+
+
 router.get('/:bookingID', async (req, res, next) => {
     try {
         const booking = await Bookings.findById(req.params.bookingID)

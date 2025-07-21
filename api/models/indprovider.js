@@ -20,6 +20,25 @@ slotSchema.pre('validate', function (next) {
   next();
 });
 
+
+//Email sign in
+//Phone sign in
+
+
+// email (Email Sign-In)
+// firstName
+// lastName
+// password
+// phone (Phone Sign-In)
+// birthdate
+// address
+// approval
+// bio
+// rating
+// availability
+// timestamps
+
+
 /* ---------- Independent Provider schema ---------- */
 const independentProviderSchema = new mongoose.Schema(
   {
@@ -76,3 +95,7 @@ const independentProviderSchema = new mongoose.Schema(
 
 /* ---------- Model export ---------- */
 module.exports = mongoose.model('indProvider', independentProviderSchema);
+
+
+
+//Add activated boolean
