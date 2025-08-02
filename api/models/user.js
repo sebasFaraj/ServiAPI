@@ -35,6 +35,21 @@ const userSchema = mongoose.Schema(
       default: 0,
       min: 0,
     },
+    carWallet: [{ type: mongoose.Schema.Types.ObjectId, ref: "Car" }],
+
+    mainCar: {
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Car",
+      validate: {
+        validator: function (value) {
+          if (!value) return true; // optional field
+          return (
+            this.carWallet && this.carWallet.some((id) => id.equals(value))
+          );
+        },
+        message: "mainCar must reference a car stored in this user's wallet",
+      },
+    },
     password: { type: String, required: true, selected: false },
     phone: {
       type: String,

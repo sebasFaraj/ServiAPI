@@ -109,7 +109,7 @@ router.post("/login", async (req, res) => {
         lastName: user.lastName,
       },
       process.env.JWT_KEY,
-      { expiresIn: "1h" }
+      { expiresIn: "14h" }
     );
 
     const { password: _, __v: __, ...safeUser } = user; // drop hash

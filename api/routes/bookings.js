@@ -1,248 +1,161 @@
-const express = require('express');
+const express = require("express");
 const router = express.Router();
-const Bookings = require('../models/booking');
-const checkAuth = require('../middleware/check-auth');
+const Bookings = require("../models/booking");
+const checkAuth = require("../middleware/check-auth"); // ⬅️ not used yet
 
+// ───────────────── GET ROUTES ─────────────────────────────────────────
 
-//GET Routes
-
-//Gets all the bookings
-router.get('/', async (req, res, next) => {
-    try {
-        const bookings = await Bookings.find()
-            .lean()
-        //.select('') Can be re-added in case information needs to be excluded
-
-        res.status(200).json({ count: bookings.length, bookings });
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
+// Get every booking
+router.get("/", async (req, res) => {
+  try {
+    const bookings = await Bookings.find().lean();
+    return res.status(200).json({ count: bookings.length, bookings });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
 });
 
-
-
-router.get('/:bookingID', async (req, res, next) => {
-    try {
-        const booking = await Bookings.findById(req.params.bookingID)
-            .lean()
-        //.select()
-
-        if (!booking) {
-            res.status(500).json({ message: 'Booking not found' });
-        }
-
-        res.status(200).json({ message: "Booking Found", booking });
+// Get one booking
+router.get("/:bookingID", async (req, res) => {
+  try {
+    const booking = await Bookings.findById(req.params.bookingID).lean();
+    if (!booking) {
+      return res.status(404).json({ message: "Booking not found" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
+    return res.status(200).json({ message: "Booking Found", booking });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
 });
 
-//Gets all bookings related to a userID
-router.get('/users/:userID', async (req, res, next) => {
-    try {
-        const bookings = await Bookings.find({ client: req.params.userID })
-            .lean()
-        //.select()
-
-        if (!bookings) {
-            return res.status(500).json({ message: "No bookings under this User" })
-        }
-
-        res.status(200).json({ count: bookings.count, bookings });
-
+// Get bookings by user
+router.get("/users/:userID", async (req, res) => {
+  try {
+    const bookings = await Bookings.find({ client: req.params.userID }).lean();
+    if (!bookings.length) {
+      return res.status(404).json({ message: "No bookings under this User" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
+    return res.status(200).json({ count: bookings.length, bookings });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
 });
 
-//Gets all bookings related to a providerID
-router.get('/providers/:providerID', async (req, res, next) => {
-    try {
-        const bookings = await Bookings.find({ provider: req.params.providerID })
-            .lean()
-        //.select()
-
-        if (!bookings) {
-            res.status(500).json({ message: "No bookings found under this Provider" })
-        }
-
-        res.status(200).json({ count: bookings.count, bookings });
+// Get bookings by driver
+router.get("/drivers/:driverID", async (req, res) => {
+  try {
+    const bookings = await Bookings.find({
+      driver: req.params.driverID,
+    }).lean();
+    if (!bookings.length) {
+      return res
+        .status(404)
+        .json({ message: "No bookings found under this Driver" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
+    return res.status(200).json({ count: bookings.length, bookings });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
 });
 
-//POST Routes 
-router.post('/newBooking', async (req, res, next) => {
-    try {
-        const booking = new Bookings({
-            provider: req.body.providerID,
-            client: req.body.userID,
-            bookingDuration: req.body.bookingDuration,
-            status: req.body.status,
-            price: req.body.price,
-            carPreference: req.body.carPreference,
-            clientRating: req.body.clientRating,
-            scheduled: req.body.scheduled,
-            scheduledStartTime: req.body.scheduledStartTime,
-            scheduledEndTime: req.body.scheduledEndTime,
-            actualStartTime: req.body.actualStartTime,
-            actualEndTime: req.body.actualEndTime,
-            distance: req.body.distance
-        })
+// ───────────────── POST ROUTES ───────────────────────────────────────
 
-        const result = await booking.save();
+// Create a new booking
+router.post("/newBooking", async (req, res) => {
+  try {
+    const {
+      userID,
+      pickup,
+      dropoff,
+      bookingDuration,
+      userPrice,
+      carPreference, // 'user' | 'driver'
+      carId, // rider-owned car if carPreference === 'user'
+      scheduledStart,
+    } = req.body;
 
-
-        //TODO: Add sanitzation and error checking
-        res.status(201).json({ message: "Booking Created", booking });
+    // ── validation ─────────────────────────────────────────────
+    if (!userID || !pickup || !dropoff || !carPreference || !scheduledStart) {
+      return res.status(400).json({ message: "Missing required fields" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
+    if (!["user", "driver"].includes(carPreference)) {
+      return res
+        .status(400)
+        .json({ message: "carPreference must be 'user' or 'driver'" });
     }
+    if (carPreference === "user" && !carId) {
+      return res
+        .status(400)
+        .json({ message: "carId required when carPreference is 'user'" });
+    }
+
+    // ── create booking doc ─────────────────────────────────────
+    const booking = new Bookings({
+      driver: null, // assigned when a driver accepts
+      client: userID,
+      pickup,
+      dropoff,
+      bookingDuration,
+      status: "pending",
+      userPrice,
+      driverEarnings: 0,
+      carPreference,
+      car: carId ?? null,
+      scheduledStart: scheduledStart ?? null,
+    });
+
+    const saved = await booking.save();
+    return res.status(201).json({ message: "Booking Created", booking: saved });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err.message });
+  }
 });
 
-//DELETE Routes
-router.delete("/removeBooking/:bookingID", async (req, res, next) => {
-    try {
-        const result = await Bookings.deleteOne({ _id: req.params.bookingID });
+// ───────────────── DELETE ROUTES ────────────────────────────────────
 
-        if (result.deletedCount === 0) {
-            return res.status(404).json({ message: 'Booking not found' });
-        }
-
-        res.status(200).json({
-            message: "Booking deleted",
-            result
-        });
-
+router.delete("/removeBooking/:bookingID", async (req, res) => {
+  try {
+    const result = await Bookings.deleteOne({ _id: req.params.bookingID });
+    if (!result.deletedCount) {
+      return res.status(404).json({ message: "Booking not found" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
+    return res.status(200).json({ message: "Booking deleted", result });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
 });
 
-//PATCH Routes
+// ───────────────── PATCH ROUTES (STATUS) ────────────────────────────
 
-//Accept
-router.patch('/accept/:bookingID', async (req, res, next) => {
-    try {
-        const result = await Bookings.updateOne({ _id: req.params.bookingID }, { status: 'Accepted' });
-
-        if (result.matchedCount <= 0) {
-            res.status(500).json({ message: "Can't find Booking" });
-        }
-
-        else if (result.modifiedCount <= 0) {
-            res.status(500).json({ message: "Can't update Booking" });
-        }
-
-        res.status(200).json({ message: "Booking Accepted", result });
-
+const setStatus = (status) => async (req, res) => {
+  try {
+    const result = await Bookings.updateOne(
+      { _id: req.params.bookingID },
+      { status }
+    );
+    if (!result.matchedCount) {
+      return res.status(404).json({ message: "Can't find Booking" });
     }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
+    if (!result.modifiedCount) {
+      return res.status(500).json({ message: "Can't update Booking" });
     }
-});
+    return res.status(200).json({ message: `Booking ${status}`, result });
+  } catch (err) {
+    console.error(err);
+    return res.status(500).json({ error: err });
+  }
+};
 
-//In Progress
-router.patch('/inProgress/:bookingID', async (req, res, next) => {
-    try {
-        const result = await Bookings.updateOne({ _id: req.params.bookingID }, { status: 'InProgress' });
-
-        if (result.matchedCount <= 0) {
-            res.status(500).json({ message: "Can't find Booking" });
-        }
-
-        else if (result.modifiedCount <= 0) {
-            res.status(500).json({ message: "Can't update Booking" });
-        }
-
-        res.status(200).json({ message: "Booking In Progress", result });
-
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-});
-
-
-//Completed
-router.patch('/completed/:bookingID', async (req, res, next) => {
-    try {
-        const result = await Bookings.updateOne({ _id: req.params.bookingID }, { status: 'Completed' });
-
-        if (result.matchedCount <= 0) {
-            res.status(500).json({ message: "Can't find Booking" });
-        }
-
-        else if (result.modifiedCount <= 0) {
-            res.status(500).json({ message: "Can't update Booking" });
-        }
-
-        res.status(200).json({ message: "Booking Completed", result });
-
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-});
-
-//Cancelled
-router.patch('/cancelled/:bookingID', async (req, res, next) => {
-    try {
-        const result = await Bookings.updateOne({ _id: req.params.bookingID }, { status: 'Cancelled' });
-
-        if (result.matchedCount <= 0) {
-            res.status(500).json({ message: "Can't find Booking" });
-        }
-
-        else if (result.modifiedCount <= 0) {
-            res.status(500).json({ message: "Can't update Booking" });
-        }
-
-        res.status(200).json({ message: "Booking Cancelled", result });
-
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-});
-
-//NoShow
-router.patch('/noShow/:bookingID', async (req, res, next) => {
-    try {
-        const result = await Bookings.updateOne({ _id: req.params.bookingID }, { status: 'NoShow' });
-
-        if (result.matchedCount <= 0) {
-            res.status(500).json({ message: "Can't find Booking" });
-        }
-
-        else if (result.modifiedCount <= 0) {
-            res.status(500).json({ message: "Can't update Booking" });
-        }
-
-        res.status(200).json({ message: "Booking set to No Show", result });
-
-    }
-    catch (err) {
-        console.log(err);
-        res.status(500).json({ error: err });
-    }
-});
+router.patch("/accept/:bookingID", setStatus("accepted"));
+router.patch("/inProgress/:bookingID", setStatus("in_progress"));
+router.patch("/completed/:bookingID", setStatus("completed"));
+router.patch("/cancelled/:bookingID", setStatus("cancelled"));
+router.patch("/noShow/:bookingID", setStatus("no_show"));
 
 module.exports = router;
