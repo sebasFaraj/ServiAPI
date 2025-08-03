@@ -190,6 +190,7 @@ router.post("/login", async (req, res) => {
         role: "provider", // you can use this in checkAuth
         firstName: provider.firstName,
         lastName: provider.lastName,
+        verified: provider.verified,
       },
       process.env.JWT_KEY,
       { expiresIn: "14h" }
