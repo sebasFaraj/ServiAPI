@@ -4,18 +4,18 @@ const bcrypt = require("bcryptjs");
 const jwt = require("jsonwebtoken");
 const Provider = require("../models/indprovider");
 const checkAuth = require("../middleware/check-auth");
+const mongoose = require("mongoose");
 
 //GET Routes
 
 //Gets all providers (omit password)
-router.get("/", async (req, res, next) => {
+router.get("/", async (_req, res) => {
   try {
     const providers = await Provider.find().lean().select("-password -__v");
-
-    res.status(200).json({ count: providers.length, providers });
+    return res.status(200).json({ count: providers.length, providers });
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: err });
+    console.error(err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -80,20 +80,27 @@ router.get("/available", async (req, res) => {
 });
 
 //Returns provider whose ID matches the one in the request
-router.get("/:providerId", async (req, res, next) => {
+router.get("/:providerId", async (req, res) => {
   try {
-    const provider = await Provider.findById(req.params.providerId)
+    const { providerId } = req.params;
+
+    // Validate ObjectId
+    if (!mongoose.Types.ObjectId.isValid(providerId)) {
+      return res.status(400).json({ message: "Invalid provider ID" });
+    }
+
+    const provider = await Provider.findById(providerId)
       .lean()
       .select("-password -__v");
 
     if (!provider) {
-      return res.status(500).json({ message: "Provider not found" });
+      return res.status(404).json({ message: "Provider not found" });
     }
 
-    res.status(200).json(provider);
+    return res.status(200).json(provider);
   } catch (err) {
-    console.log(err);
-    res.status(500).json({ error: err });
+    console.error(err);
+    return res.status(500).json({ error: err.message });
   }
 });
 
@@ -126,6 +133,7 @@ router.post("/signup", async (req, res, next) => {
       verified: false,
       bio: req.body.bio,
       availability: req.body.availability,
+      currentLoc: req.body.currentLoc || { type: "Point", coordinates: [0, 0] },
     });
 
     //Save to db and wait for result
@@ -170,6 +178,10 @@ router.post("/login", async (req, res) => {
     if (!match) {
       return res.status(401).json({ message: "Auth failed" });
     }
+    // Require account verification before allowing login
+    if (!provider.verified) {
+      return res.status(403).json({ message: "Account not verified" });
+    }
 
     const token = jwt.sign(
       {
@@ -213,6 +225,28 @@ router.delete("/:providerId", checkAuth, (req, res, next) => {
       console.error(err);
       res.status(500).json({ error: err });
     });
+});
+
+// Verify a driver account (e.g., after document review)
+router.patch("/verify/:driverId", async (req, res) => {
+  try {
+    const { driverId } = req.params;
+
+    const updated = await Provider.findByIdAndUpdate(
+      driverId,
+      { verified: true, updatedAt: Date.now() },
+      { new: true, runValidators: true }
+    ).lean();
+
+    if (!updated) {
+      return res.status(404).json({ message: "Driver not found" });
+    }
+
+    res.json({ message: "Driver verified", driver: updated });
+  } catch (err) {
+    console.error(err);
+    res.status(500).json({ error: err.message });
+  }
 });
 
 // Driver goes online (called right after Socket.io connects)

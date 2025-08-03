@@ -88,10 +88,12 @@ const independentProviderSchema = new mongoose.Schema(
         type: String,
         enum: ["Point"],
         default: "Point",
+        required: true,
       },
       coordinates: {
         type: [Number], // [lng, lat]
-        index: "2dsphere",
+        default: [0, 0],
+        required: true,
       },
     },
     updatedAt: { type: Date, default: Date.now },
